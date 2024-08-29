@@ -47,19 +47,49 @@ export default function ChatTopbar({
     const env = process.env.NODE_ENV;
 
     const fetchModels = async () => {
-      if (env === "production") {
-        const fetchedModels = await fetch(process.env.NEXT_PUBLIC_OLLAMA_URL + "/api/tags");
-        const json = await fetchedModels.json();
-        const apiModels = json.models.map((model : any) => model.name);
-        setModels([...apiModels]);
-      } 
-      else {
-        const fetchedModels = await fetch("/api/tags") 
-        const json = await fetchedModels.json();
-        const apiModels = json.models.map((model : any) => model.name);
-        setModels([...apiModels]);
-    }
-    }
+      try {
+        const url = env === "production"
+          ? process.env.NEXT_PUBLIC_OLLAMA_URL + "/api/tags"
+          : "/api/tags";
+        
+        const fetchedModels = await fetch(url);
+
+        // Überprüfen, ob die Antwort erfolgreich ist (Status 200-299)
+        if (!fetchedModels.ok) {
+          console.error("Fehler beim Abrufen der Modelle:", fetchedModels.statusText);
+          return; // Beendet die Ausführung, wenn ein Fehler vorliegt
+        }
+
+        // Antworttext extrahieren
+        const text = await fetchedModels.text();
+
+        // Überprüfen, ob die Antwort leer ist
+        if (!text) {
+          console.error("Leere Antwort von der API");
+          return;
+        }
+
+        // Versuche, die Antwort als JSON zu parsen
+        let json;
+        try {
+          json = JSON.parse(text);
+        } catch (e) {
+          console.error("Fehler beim Parsen der JSON-Antwort:", e);
+          return;
+        }
+
+        // Überprüfe, ob das JSON-Objekt die erwartete Struktur hat
+        if (json.models && Array.isArray(json.models)) {
+          const apiModels = json.models.map((model: any) => model.name);
+          setModels([...apiModels]);
+        } else {
+          console.error("Unerwartete JSON-Struktur:", json);
+        }
+      } catch (error) {
+        console.error("Fehler beim Abrufen der Modelle:", error);
+      }
+    };
+
     fetchModels();
   }, []);
 
@@ -77,7 +107,7 @@ export default function ChatTopbar({
   };
 
   return (
-    <div className="w-full flex px-4 py-6  items-center justify-between lg:justify-center ">
+    <div className="w-full flex px-4 py-6 items-center justify-between lg:justify-center ">
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetTrigger>
           <HamburgerMenuIcon className="lg:hidden w-5 h-5" />
@@ -122,7 +152,7 @@ export default function ChatTopbar({
               </Button>
             ))
           ) : (
-            <Button variant="ghost" disabled className=" w-full">
+            <Button variant="ghost" disabled className="w-full">
               No models available
             </Button>
           )}
